@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulação de Aposentadoria</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; padding: 20px 14px; }
+h1 { text-align: center; font-size: 1.35rem; color: #fff; margin-bottom: 3px; }
+.subtitle { text-align: center; color: #666; font-size: 0.8rem; margin-bottom: 20px; }
+.section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #555; margin-bottom: 10px; padding-left: 2px; }
+
+/* MODE BAR */
+.mode-bar { display: flex; gap: 6px; margin-bottom: 16px; background: #13151e; border-radius: 10px; padding: 5px; }
+.mode-btn { flex: 1; text-align: center; padding: 9px 6px; border-radius: 7px; border: none; cursor: pointer;
+  font-size: 0.75rem; font-weight: 700; transition: all 0.2s; color: #555; background: transparent; }
+.mode-btn.active { background: #1a1d27; color: #e0e0e0; box-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+.mode-btn.active.m-auto { color: #a78bfa; }
+.mode-btn.active.m-man  { color: #60a5fa; }
+
+/* GRIDS */
+.global-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.auto-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.hidden { display: none !important; }
+
+.ctrl { background: #1a1d27; border-radius: 10px; padding: 12px; }
+.ctrl label { display: block; font-size: 0.68rem; color: #777; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
+.ctrl input[type=range] { width: 100%; accent-color: #6c63ff; cursor: pointer; }
+.ctrl .val { font-size: 1rem; font-weight: 700; color: #6c63ff; margin-top: 4px; }
+.ctrl.purple .val { color: #a78bfa; }
+.ctrl input[type=range].purple { accent-color: #a78bfa; }
+
+/* AUTO MODE BANNER */
+.auto-banner { background: #1a1530; border: 1px solid #2e2050; border-radius: 8px;
+  padding: 10px 13px; margin-bottom: 16px; font-size: 0.78rem; color: #c4b5fd; line-height: 1.6; }
+
+/* METRICS */
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.metric { background: #1a1d27; border-radius: 10px; padding: 12px; text-align: center; }
+.metric .mlabel { font-size: 0.65rem; color: #777; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+.metric .mval { font-size: 1.05rem; font-weight: 800; }
+.c-green { color:#4ade80; } .c-purple { color:#a78bfa; }
+.c-blue  { color:#60a5fa; } .c-orange { color:#fb923c; } .c-pink { color:#f9a8d4; }
+.metric.wide { grid-column: span 2; border: 1px solid #1e2133; }
+
+/* CHARTS */
+.chart-card { background: #1a1d27; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+.chart-card h2 { font-size: 0.82rem; color: #ccc; margin-bottom: 10px; }
+canvas { max-height: 200px; }
+
+/* ALERT */
+.alert { border-radius: 8px; padding: 11px 13px; margin-bottom: 16px; font-size: 0.79rem; color: #ccc; line-height: 1.6; }
+.alert.ok   { background: #0a1f10; border-left: 3px solid #4ade80; }
+.alert.warn { background: #1c1a10; border-left: 3px solid #fb923c; }
+
+/* TABLE */
+.table-card { background: #1a1d27; border-radius: 10px; padding: 14px; margin-bottom: 16px; overflow-x: auto; }
+.table-card h2 { font-size: 0.82rem; color: #ccc; margin-bottom: 4px; }
+.table-hint { font-size: 0.68rem; color: #555; margin-bottom: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.74rem; min-width: 500px; }
+th { color: #666; text-align: left; padding: 6px 7px; border-bottom: 1px solid #1e2133; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; }
+td { padding: 5px 6px; border-bottom: 1px solid #13151e; vertical-align: middle; }
+tr.apo-row td { background: #0a1f10 !important; }
+tr:hover:not(.apo-row) td { background: #161925; }
+
+.tog { font-size: 0.62rem; padding: 2px 7px; border-radius: 4px; border: none; cursor: pointer; font-weight: 700; transition: all 0.15s; white-space: nowrap; }
+.tog.i-on  { background:#1e3a5f; color:#60a5fa; }
+.tog.i-off { background:#181b26; color:#444; }
+.tog.r-on  { background:#1a3825; color:#4ade80; }
+.tog.r-off { background:#181b26; color:#444; }
+.tog:disabled { opacity: 0.3; cursor: default; }
+
+.num-input { width: 80px; background: #0f1117; border: 1px solid #252838; border-radius: 5px;
+  color: #e0e0e0; font-size: 0.74rem; padding: 3px 6px; text-align: right; transition: border 0.15s; }
+.num-input:focus { outline: none; border-color: #6c63ff; }
+.num-input:disabled { opacity: 0.25; cursor: not-allowed; }
+.num-input.auto-val { border-color: #2e2050; color: #a78bfa; cursor: default; }
+
+.pat-cell { color: #a78bfa; font-weight: 700; }
+.inc-tag { font-size: 0.6rem; color: #a78bfa; display: block; margin-top: 1px; }
+
+.footer { text-align: center; font-size: 0.65rem; color: #3a3a4a; margin-top: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>📈 Simulação de Aposentadoria</h1>
+<p class="subtitle">Modo manual ou automático • configure cada ano livremente</p>
+
+<!-- MODE SELECTOR -->
+<p class="section-title">🔄 Modo de preenchimento</p>
+<div class="mode-bar">
+  <button class="mode-btn m-man active" onclick="setMode('manual')">✏️ Manual<br><span style="font-weight:400;font-size:0.65rem;color:#666">você edita cada célula</span></button>
+  <button class="mode-btn m-auto" onclick="setMode('auto')">⚡ Automático<br><span style="font-weight:400;font-size:0.65rem;color:#666">corrige inflação + incremento</span></button>
+</div>
+
+<!-- AUTO CONFIG (só aparece no modo automático) -->
+<div id="autoConfig" class="auto-grid hidden">
+  <div class="ctrl purple">
+    <label>Aporte inicial IPCA+ /mês</label>
+    <input type="range" class="purple" id="autoIpcaBase" min="100" max="5000" value="400" step="50" oninput="onAuto()">
+    <div class="val" id="v_autoIpcaBase">R$ 400</div>
+  </div>
+  <div class="ctrl purple">
+    <label>Incremento anual IPCA+ /mês</label>
+    <input type="range" class="purple" id="autoIpcaInc" min="0" max="500" value="100" step="50" oninput="onAuto()">
+    <div class="val" id="v_autoIpcaInc">+ R$ 100/ano</div>
+  </div>
+  <div class="ctrl purple">
+    <label>Aporte inicial RV /mês</label>
+    <input type="range" class="purple" id="autoRvBase" min="0" max="5000" value="1000" step="100" oninput="onAuto()">
+    <div class="val" id="v_autoRvBase">R$ 1.000</div>
+  </div>
+  <div class="ctrl purple">
+    <label>Incremento anual RV /mês</label>
+    <input type="range" class="purple" id="autoRvInc" min="0" max="500" value="100" step="50" oninput="onAuto()">
+    <div class="val" id="v_autoRvInc">+ R$ 100/ano</div>
+  </div>
+  <div class="ctrl purple">
+    <label>RV começa no ano</label>
+    <input type="range" class="purple" id="autoRvStart" min="0" max="5" value="1" step="1" oninput="onAuto()">
+    <div class="val" id="v_autoRvStart">2º ano</div>
+  </div>
+  <div class="ctrl purple">
+    <label>IPCA+ começa no ano</label>
+    <input type="range" class="purple" id="autoIpcaStart" min="0" max="5" value="0" step="1" oninput="onAuto()">
+    <div class="val" id="v_autoIpcaStart">1º ano</div>
+  </div>
+</div>
+
+<!-- AUTO BANNER -->
+<div id="autoBanner" class="auto-banner hidden">
+  ⚡ <strong>Modo automático ativo:</strong> os aportes são corrigidos pela inflação todo ano e somados ao incremento configurado. Os valores na tabela são calculados automaticamente — você ainda pode ativar/desativar cada modalidade por ano.
+</div>
+
+<!-- PARÂMETROS GLOBAIS -->
+<p class="section-title">⚙️ Parâmetros de mercado</p>
+<div class="global-grid">
+  <div class="ctrl">
+    <label>Idade atual</label>
+    <input type="range" id="idadeAtual" min="18" max="55" value="33" step="1" oninput="onGlobal()">
+    <div class="val" id="v_idadeAtual">33 anos</div>
+  </div>
+  <div class="ctrl">
+    <label>Aposentar aos</label>
+    <input type="range" id="idadeMeta" min="45" max="75" value="57" step="1" oninput="onGlobal()">
+    <div class="val" id="v_idadeMeta">57 anos</div>
+  </div>
+  <div class="ctrl">
+    <label>Ano de início</label>
+    <input type="range" id="anoInicio" min="2024" max="2030" value="2026" step="1" oninput="onGlobal()">
+    <div class="val" id="v_anoInicio">2026</div>
+  </div>
+  <div class="ctrl">
+    <label>Inflação estimada</label>
+    <input type="range" id="inflacao" min="2" max="10" value="4" step="0.5" oninput="onGlobal()">
+    <div class="val" id="v_inflacao">4,0% a.a.</div>
+  </div>
+  <div class="ctrl">
+    <label>Juro real IPCA+</label>
+    <input type="range" id="juroReal" min="3" max="10" value="7" step="0.5" oninput="onGlobal()">
+    <div class="val" id="v_juroReal">7,0% a.a.</div>
+  </div>
+  <div class="ctrl">
+    <label>Retorno R. Variável (real)</label>
+    <input type="range" id="retornoRV" min="5" max="20" value="12" step="1" oninput="onGlobal()">
+    <div class="val" id="v_retornoRV">12% a.a.</div>
+  </div>
+</div>
+
+<!-- RESULTADOS -->
+<p class="section-title">📊 Resultados</p>
+<div class="metrics">
+  <div class="metric">
+    <div class="mlabel">Patrimônio final</div>
+    <div class="mval c-green" id="m_patrimonio">—</div>
+  </div>
+  <div class="metric">
+    <div class="mlabel">Renda mensal (nominal)</div>
+    <div class="mval c-purple" id="m_renda">—</div>
+  </div>
+  <div class="metric">
+    <div class="mlabel">Anos até aposentadoria</div>
+    <div class="mval c-blue" id="m_anos">—</div>
+  </div>
+  <div class="metric">
+    <div class="mlabel">Total aportado</div>
+    <div class="mval c-orange" id="m_aportado">—</div>
+  </div>
+  <div class="metric wide">
+    <div class="mlabel">💡 Renda em poder de compra de HOJE</div>
+    <div class="mval c-pink" id="m_rendaReal">—</div>
+    <div style="font-size:0.65rem;color:#444;margin-top:3px;">Deflacionado pela inflação acumulada — o que vale em dinheiro de hoje</div>
+  </div>
+</div>
+
+<div class="alert warn" id="alertaMeta">Calculando...</div>
+
+<div class="chart-card">
+  <h2>📈 Evolução do patrimônio por ano</h2>
+  <canvas id="chartP"></canvas>
+</div>
+<div class="chart-card">
+  <h2>🥧 Composição final do patrimônio</h2>
+  <canvas id="chartC"></canvas>
+</div>
+
+<!-- TABELA -->
+<div class="table-card">
+  <h2>📅 Aportes ano a ano</h2>
+  <p class="table-hint" id="tableHint">Ative/desative cada modalidade por ano e edite o valor diretamente na célula.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Ano</th>
+        <th>Idade</th>
+        <th colspan="2">Renda Fixa IPCA+</th>
+        <th colspan="2">Renda Variável</th>
+        <th>Patrimônio acum.</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="footer">
+  ⚠️ Simulação educacional. Não constitui recomendação de investimento.<br>
+  Renda calculada pela Regra dos 4% (taxa segura de retirada anual).
+</div>
+
+<script>
+const fmt  = v => { if (!v||isNaN(v)) return 'R$ 0'; if (v>=1e6) return 'R$ '+(v/1e6).toFixed(2).replace('.',',')+'mi'; return 'R$ '+Math.round(v).toLocaleString('pt-BR'); };
+const fmtM = v => fmt(v)+'/mês';
+const ordinal = n => n===0?'1º':n===1?'2º':n===2?'3º':`${n+1}º`;
+
+let S = {};          // estado manual: Map<ano,{ipca,rv,ipcaOn,rvOn}>
+let mode = 'manual'; // 'manual' | 'auto'
+let chartP, chartC;
+
+/* ── leitura de sliders ── */
+function P() {
+  return {
+    idadeAtual: +document.getElementById('idadeAtual').value,
+    idadeMeta:  +document.getElementById('idadeMeta').value,
+    anoInicio:  +document.getElementById('anoInicio').value,
+    inflacao:   +document.getElementById('inflacao').value / 100,
+    juroReal:   +document.getElementById('juroReal').value / 100,
+    retornoRV:  +document.getElementById('retornoRV').value / 100,
+  };
+}
+function AP() {
+  return {
+    ipcaBase:  +document.getElementById('autoIpcaBase').value,
+    ipcaInc:   +document.getElementById('autoIpcaInc').value,
+    rvBase:    +document.getElementById('autoRvBase').value,
+    rvInc:     +document.getElementById('autoRvInc').value,
+    rvStart:   +document.getElementById('autoRvStart').value,
+    ipcaStart: +document.getElementById('autoIpcaStart').value,
+  };
+}
+
+/* ── labels ── */
+function updateLabels(p) {
+  document.getElementById('v_idadeAtual').textContent = p.idadeAtual+' anos';
+  document.getElementById('v_idadeMeta').textContent  = p.idadeMeta+' anos';
+  document.getElementById('v_anoInicio').textContent  = p.anoInicio;
+  document.getElementById('v_inflacao').textContent   = (p.inflacao*100).toFixed(1).replace('.',',')+' % a.a.';
+  document.getElementById('v_juroReal').textContent   = (p.juroReal*100).toFixed(1).replace('.',',')+' % a.a.';
+  document.getElementById('v_retornoRV').textContent  = (p.retornoRV*100).toFixed(0)+'% a.a.';
+}
+function updateAutoLabels(ap) {
+  document.getElementById('v_autoIpcaBase').textContent = 'R$ '+ap.ipcaBase.toLocaleString('pt-BR');
+  document.getElementById('v_autoIpcaInc').textContent  = ap.ipcaInc>0?'+ R$ '+ap.ipcaInc+'/ano':'sem incremento';
+  document.getElementById('v_autoRvBase').textContent   = 'R$ '+ap.rvBase.toLocaleString('pt-BR');
+  document.getElementById('v_autoRvInc').textContent    = ap.rvInc>0?'+ R$ '+ap.rvInc+'/ano':'sem incremento';
+  document.getElementById('v_autoRvStart').textContent  = ordinal(ap.rvStart)+' ano';
+  document.getElementById('v_autoIpcaStart').textContent= ordinal(ap.ipcaStart)+' ano';
+}
+
+/* ── modo ── */
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(m==='auto'?'.m-auto':'.m-man').classList.add('active');
+  document.getElementById('autoConfig').classList.toggle('hidden', m!=='auto');
+  document.getElementById('autoBanner').classList.toggle('hidden', m!=='auto');
+  document.getElementById('tableHint').textContent = m==='auto'
+    ? 'No modo automático os aportes são calculados automaticamente. Você ainda pode ativar/desativar cada modalidade por ano.'
+    : 'Ative/desative cada modalidade por ano e edite o valor diretamente na célula.';
+  refresh();
+}
+
+/* ── calcula aportes automáticos ── */
+function autoAportes(p, ap) {
+  const anos = p.idadeMeta - p.idadeAtual;
+  const result = {};
+  let ipcaVal = ap.ipcaBase;
+  let rvVal   = ap.rvBase;
+
+  for (let i = 0; i < anos; i++) {
+    const ano = p.anoInicio + i;
+    const old = S[ano] || {};
+
+    // corrige pela inflação a partir do 2º ano e soma incremento
+    if (i > 0) {
+      ipcaVal = ipcaVal * (1 + p.inflacao) + ap.ipcaInc;
+      rvVal   = rvVal   * (1 + p.inflacao) + ap.rvInc;
+    }
+
+    const ipcaAtivo = i >= ap.ipcaStart;
+    const rvAtiva   = i >= ap.rvStart;
+
+    result[ano] = {
+      ipca:   Math.round(ipcaVal),
+      rv:     Math.round(rvVal),
+      ipcaOn: old.ipcaOn !== undefined ? old.ipcaOn : ipcaAtivo,
+      rvOn:   old.rvOn   !== undefined ? old.rvOn   : rvAtiva,
+    };
+  }
+  return result;
+}
+
+/* ── sincroniza estado manual ── */
+function syncManual(p) {
+  const anos = p.idadeMeta - p.idadeAtual;
+  const newS = {};
+  for (let i = 0; i < anos; i++) {
+    const ano = p.anoInicio + i;
+    const old = S[ano];
+    newS[ano] = {
+      ipca:   old?.ipca   ?? 400,
+      rv:     old?.rv     ?? (i===0?0:1000),
+      ipcaOn: old?.ipcaOn ?? true,
+      rvOn:   old?.rvOn   ?? (i>0),
+    };
+  }
+  S = newS;
+}
+
+/* ── constrói tabela ── */
+function buildTable(p, rows) {
+  const anos = p.idadeMeta - p.idadeAtual;
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  const isAuto = mode === 'auto';
+
+  for (let i = 0; i < anos; i++) {
+    const ano = p.anoInicio + i;
+    const idade = p.idadeAtual + i;
+    const s = rows[ano];
+    const isLast = i === anos-1;
+    const tr = document.createElement('tr');
+    if (isLast) tr.className = 'apo-row';
+
+    const ipcaInputClass = 'num-input'+(isAuto?' auto-val':'');
+    const rvInputClass   = 'num-input'+(isAuto?' auto-val':'');
+
+    tr.innerHTML = `
+      <td><strong>${ano}</strong>${isLast?' 🎯':''}</td>
+      <td>${idade}</td>
+      <td>
+        <button class="tog ${s.ipcaOn?'i-on':'i-off'}"
+          onclick="toggleRow(${ano},'ipca')">${s.ipcaOn?'✓ ATIVO':'INATIVO'}</button>
+      </td>
+      <td>
+        <input class="${ipcaInputClass}" type="number" id="i_${ano}"
+          value="${s.ipca}" min="0" step="50"
+          ${s.ipcaOn?'':'disabled'}
+          ${isAuto?'readonly':''}
+          onchange="changeVal(${ano},'ipca',this.value)">
+      </td>
+      <td>
+        <button class="tog ${s.rvOn?'r-on':'r-off'}"
+          onclick="toggleRow(${ano},'rv')">${s.rvOn?'✓ ATIVO':'INATIVO'}</button>
+      </td>
+      <td>
+        <input class="${rvInputClass}" type="number" id="r_${ano}"
+          value="${s.rv}" min="0" step="100"
+          ${s.rvOn?'':'disabled'}
+          ${isAuto?'readonly':''}
+          onchange="changeVal(${ano},'rv',this.value)">
+      </td>
+      <td class="pat-cell" id="pat_${ano}">—</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ── toggle individual ── */
+function toggleRow(ano, tipo) {
+  // funciona nos dois modos — apenas liga/desliga
+  const target = mode==='auto' ? autoRows : S;
+  if (tipo==='ipca') target[ano].ipcaOn = !target[ano].ipcaOn;
+  else               target[ano].rvOn   = !target[ano].rvOn;
+  if (mode==='auto') { autoRows = target; }
+  else               { S = target; }
+  refresh();
+}
+
+/* ── edição manual de valor ── */
+function changeVal(ano, tipo, val) {
+  if (mode==='auto') return; // readonly
+  const v = Math.max(0, parseFloat(val)||0);
+  if (tipo==='ipca') S[ano].ipca = v;
+  else               S[ano].rv   = v;
+  calcular(P(), S);
+}
+
+/* ── cálculo financeiro ── */
+function calcular(p, rows) {
+  const taxaIPCA = (1+p.juroReal)*(1+p.inflacao)-1;
+  const taxaRV   = (1+p.retornoRV)*(1+p.inflacao)-1;
+  const rMIPCA   = Math.pow(1+taxaIPCA, 1/12)-1;
+  const rMRV     = Math.pow(1+taxaRV,   1/12)-1;
+  const anos = p.idadeMeta - p.idadeAtual;
+
+  let sIPCA=0, sRV=0, totalAp=0;
+  const labels=[], dI=[], dR=[], dT=[];
+
+  for (let i=0; i<anos; i++) {
+    const ano = p.anoInicio+i;
+    const s = rows[ano] || {ipca:0,rv:0,ipcaOn:false,rvOn:false};
+    const aI = s.ipcaOn ? (s.ipca||0) : 0;
+    const aR = s.rvOn   ? (s.rv||0)   : 0;
+    for (let m=0; m<12; m++) {
+      sIPCA = (sIPCA+aI)*(1+rMIPCA);
+      sRV   = (sRV+aR)*(1+rMRV);
+      totalAp += aI+aR;
+    }
+    const tot = sIPCA+sRV;
+    labels.push(ano); dI.push(Math.round(sIPCA)); dR.push(Math.round(sRV)); dT.push(Math.round(tot));
+    const cell = document.getElementById('pat_'+ano);
+    if (cell) cell.textContent = fmt(tot);
+  }
+
+  const patFinal    = sIPCA+sRV;
+  const rendaMensal = patFinal*0.04/12;
+  const deflator    = Math.pow(1+p.inflacao, anos);
+  const rendaReal   = rendaMensal/deflator;
+
+  document.getElementById('m_patrimonio').textContent = fmt(patFinal);
+  document.getElementById('m_renda').textContent      = fmtM(rendaMensal);
+  document.getElementById('m_anos').textContent       = anos+' anos';
+  document.getElementById('m_aportado').textContent   = fmt(totalAp);
+  document.getElementById('m_rendaReal').textContent  = fmtM(rendaReal);
+
+  const al = document.getElementById('alertaMeta');
+  if (rendaMensal >= 10000) {
+    al.className='alert ok';
+    al.innerHTML=`<strong>✅ Meta atingida!</strong> Renda nominal de ${fmtM(rendaMensal)} — equivalente a <strong>${fmtM(rendaReal)}</strong> em poder de compra de hoje.`;
+  } else {
+    al.className='alert warn';
+    al.innerHTML=`<strong>⚠️ Ainda não atingiu a meta.</strong> Renda nominal de ${fmtM(rendaMensal)} (${fmtM(rendaReal)} hoje). Aumente os aportes para chegar em R$ 10.000/mês.`;
+  }
+
+  if (chartP) chartP.destroy();
+  chartP = new Chart(document.getElementById('chartP'), {
+    type:'line',
+    data:{ labels, datasets:[
+      {label:'IPCA+', data:dI, borderColor:'#60a5fa', backgroundColor:'rgba(96,165,250,0.07)', fill:true, tension:0.4, pointRadius:2},
+      {label:'R. Var.', data:dR, borderColor:'#4ade80', backgroundColor:'rgba(74,222,128,0.07)', fill:true, tension:0.4, pointRadius:2},
+      {label:'Total', data:dT, borderColor:'#a78bfa', fill:false, tension:0.4, pointRadius:2, borderDash:[4,3]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{labels:{color:'#888',font:{size:11}}}},
+      scales:{
+        x:{ticks:{color:'#555',font:{size:10}},grid:{color:'#13151e'}},
+        y:{ticks:{color:'#555',font:{size:10},callback:v=>v>=1e6?(v/1e6).toFixed(1)+'M':(v/1e3).toFixed(0)+'K'},grid:{color:'#13151e'}}
+      }
+    }
+  });
+
+  if (chartC) chartC.destroy();
+  if (patFinal>0) {
+    chartC = new Chart(document.getElementById('chartC'), {
+      type:'doughnut',
+      data:{labels:['IPCA+ (Tesouro)','Renda Variável'],
+        datasets:[{data:[Math.round(sIPCA),Math.round(sRV)],backgroundColor:['#60a5fa','#4ade80'],borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:true,
+        plugins:{legend:{labels:{color:'#888',font:{size:11}}}}}
+    });
+  }
+}
+
+/* ── ponto central de atualização ── */
+let autoRows = {};
+
+function refresh() {
+  const p  = P();
+  updateLabels(p);
+  let rows;
+  if (mode==='auto') {
+    const ap = AP();
+    updateAutoLabels(ap);
+    // preserva on/off do estado anterior se existir
+    const computed = autoAportes(p, ap);
+    // merge: mantém ipcaOn/rvOn se usuário já clicou
+    Object.keys(computed).forEach(ano => {
+      if (autoRows[ano] !== undefined) {
+        computed[ano].ipcaOn = autoRows[ano].ipcaOn;
+        computed[ano].rvOn   = autoRows[ano].rvOn;
+      }
+    });
+    autoRows = computed;
+    rows = autoRows;
+  } else {
+    syncManual(p);
+    rows = S;
+  }
+  buildTable(p, rows);
+  calcular(p, rows);
+}
+
+function onGlobal() { refresh(); }
+function onAuto()   { refresh(); }
+
+refresh();
+</script>
+</body>
+</html>
