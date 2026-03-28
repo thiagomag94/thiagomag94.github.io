@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulação de Aposentadoria</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; padding: 20px 14px; }
+h1 { text-align: center; font-size: 1.35rem; color: #fff; margin-bottom: 3px; }
+.subtitle { text-align: center; color: #666; font-size: 0.8rem; margin-bottom: 20px; }
+.section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #555; margin-bottom: 10px; padding-left: 2px; display: flex; align-items: center; gap: 6px; }
+
+/* MODE BAR */
+.mode-wrap { position: relative; margin-bottom: 16px; }
+.mode-bar { display: flex; gap: 6px; background: #13151e; border-radius: 10px; padding: 5px; }
+.mode-btn { flex: 1; text-align: center; padding: 9px 6px; border-radius: 7px; border: none; cursor: pointer;
+  font-size: 0.75rem; font-weight: 700; transition: all 0.2s; color: #555; background: transparent; }
+.mode-btn.active { background: #1a1d27; color: #e0e0e0; box-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+.mode-btn.active.m-auto { color: #a78bfa; }
+.mode-btn.active.m-man  { color: #60a5fa; }
+.mode-help-btn { position: absolute; top: 50%; right: -4px; transform: translateY(-50%);
+  background: none; border: none; color: #444; font-size: 0.8rem; cursor: pointer;
+  padding: 4px; transition: color 0.15s; line-height: 1; }
+.mode-help-btn:hover { color: #a78bfa; }
+
+/* GRIDS */
+.global-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.auto-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.hidden { display: none !important; }
+
+.ctrl { background: #1a1d27; border-radius: 10px; padding: 12px; position: relative; }
+.ctrl label { display: block; font-size: 0.68rem; color: #777; margin-bottom: 5px;
+  text-transform: uppercase; letter-spacing: 0.05em; padding-right: 22px; }
+.ctrl input[type=range] { width: 100%; accent-color: #6c63ff; cursor: pointer; }
+.ctrl .val { font-size: 1rem; font-weight: 700; color: #6c63ff; margin-top: 4px; }
+.ctrl.purple .val { color: #a78bfa; }
+.ctrl input[type=range].purple { accent-color: #a78bfa; }
+
+/* INFO BUTTON on each card */
+.info-btn { position: absolute; top: 9px; right: 9px; width: 19px; height: 19px;
+  border-radius: 50%; background: #252838; border: none; color: #555;
+  font-size: 0.62rem; font-weight: 800; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; line-height: 1; }
+.info-btn:hover { background: #6c63ff; color: #fff; transform: scale(1.1); }
+
+/* MODAL */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+  z-index: 999; align-items: center; justify-content: center; padding: 20px; }
+.overlay.open { display: flex; }
+.modal { background: #1a1d27; border-radius: 14px; max-width: 400px; width: 100%;
+  box-shadow: 0 10px 50px rgba(0,0,0,0.7); animation: pop 0.18s ease; overflow: hidden; }
+@keyframes pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal-head { display: flex; justify-content: space-between; align-items: center;
+  padding: 15px 16px 12px; border-bottom: 1px solid #222535; }
+.modal-head h3 { font-size: 0.92rem; color: #fff; }
+.modal-x { background: #252838; border: none; color: #888; width: 24px; height: 24px;
+  border-radius: 50%; cursor: pointer; font-size: 0.85rem;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.modal-x:hover { background: #e53e3e; color: #fff; }
+.modal-body { padding: 15px 16px 18px; font-size: 0.81rem; color: #aaa; line-height: 1.75; }
+.modal-body strong { color: #ddd; }
+.modal-body p + p { margin-top: 10px; }
+.tip { background: #12151e; border-radius: 7px; padding: 9px 12px; margin-top: 12px;
+  font-size: 0.77rem; line-height: 1.6; border-left: 3px solid #6c63ff; color: #a78bfa; }
+.tip.g { border-color:#4ade80; color:#86efac; }
+.tip.b { border-color:#60a5fa; color:#93c5fd; }
+.tip.o { border-color:#fb923c; color:#fdba74; }
+.tip.p { border-color:#f9a8d4; color:#fbcfe8; }
+
+/* AUTO BANNER */
+.auto-banner { background: #1a1530; border: 1px solid #2e2050; border-radius: 8px;
+  padding: 10px 13px; margin-bottom: 16px; font-size: 0.78rem; color: #c4b5fd; line-height: 1.6; }
+
+/* METRICS */
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.metric { background: #1a1d27; border-radius: 10px; padding: 12px; text-align: center; position: relative; }
+.metric .mlabel { font-size: 0.65rem; color: #777; text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 5px; padding-right: 20px; }
+.metric .mval { font-size: 1.05rem; font-weight: 800; }
+.c-green{color:#4ade80;} .c-purple{color:#a78bfa;} .c-blue{color:#60a5fa;}
+.c-orange{color:#fb923c;} .c-pink{color:#f9a8d4;}
+.metric.wide { grid-column: span 2; border: 1px solid #1e2133; }
+
+/* CHARTS */
+.chart-card { background: #1a1d27; border-radius: 10px; padding: 14px; margin-bottom: 14px; position: relative; }
+.chart-card h2 { font-size: 0.82rem; color: #ccc; margin-bottom: 10px; padding-right: 26px; }
+canvas { max-height: 200px; }
+
+/* ALERT */
+.alert { border-radius: 8px; padding: 11px 13px; margin-bottom: 16px; font-size: 0.79rem; color: #ccc; line-height: 1.6; }
+.alert.ok   { background: #0a1f10; border-left: 3px solid #4ade80; }
+.alert.warn { background: #1c1a10; border-left: 3px solid #fb923c; }
+
+/* TABLE */
+.table-card { background: #1a1d27; border-radius: 10px; padding: 14px; margin-bottom: 16px; overflow-x: auto; }
+.table-card h2 { font-size: 0.82rem; color: #ccc; margin-bottom: 4px; }
+.table-hint { font-size: 0.68rem; color: #555; margin-bottom: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.74rem; min-width: 500px; }
+th { color: #666; text-align: left; padding: 6px 7px; border-bottom: 1px solid #1e2133;
+  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; }
+td { padding: 5px 6px; border-bottom: 1px solid #13151e; vertical-align: middle; }
+tr.apo-row td { background: #0a1f10 !important; }
+tr:hover:not(.apo-row) td { background: #161925; }
+
+.tog { font-size: 0.62rem; padding: 2px 7px; border-radius: 4px; border: none;
+  cursor: pointer; font-weight: 700; transition: all 0.15s; white-space: nowrap; }
+.tog.i-on  { background:#1e3a5f; color:#60a5fa; }
+.tog.i-off { background:#181b26; color:#444; }
+.tog.r-on  { background:#1a3825; color:#4ade80; }
+.tog.r-off { background:#181b26; color:#444; }
+
+.num-input { width: 80px; background: #0f1117; border: 1px solid #252838;
+  border-radius: 5px; color: #e0e0e0; font-size: 0.74rem; padding: 3px 6px;
+  text-align: right; transition: border 0.15s; }
+.num-input:focus { outline: none; border-color: #6c63ff; }
+.num-input:disabled { opacity: 0.25; cursor: not-allowed; }
+.num-input.auto-val { border-color: #2e2050; color: #a78bfa; cursor: default; }
+.pat-cell { color: #a78bfa; font-weight: 700; }
+.footer { text-align: center; font-size: 0.65rem; color: #3a3a4a; margin-top: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<!-- MODAL OVERLAY -->
+<div class="overlay" id="overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <h3 id="modal-title">Ajuda</h3>
+      <button class="modal-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<h1>📈 Simulação de Aposentadoria</h1>
+<p class="subtitle">Modo manual ou automático • configure cada ano livremente</p>
+
+<!-- MODE -->
+<div class="section-title">
+  🔄 Modo de preenchimento
+  <button class="info-btn" style="position:static;width:17px;height:17px;font-size:0.58rem;" onclick="openModal('modo')">ℹ</button>
+</div>
+<div class="mode-wrap">
+  <div class="mode-bar">
+    <button class="mode-btn m-man active" onclick="setMode('manual')">✏️ Manual<br><span style="font-weight:400;font-size:0.65rem;color:#666">você edita cada célula</span></button>
+    <button class="mode-btn m-auto" onclick="setMode('auto')">⚡ Automático<br><span style="font-weight:400;font-size:0.65rem;color:#666">corrige inflação + incremento</span></button>
+  </div>
+</div>
+
+<!-- AUTO CONFIG -->
+<div id="autoConfig" class="auto-grid hidden">
+  <div class="ctrl purple">
+    <label>Aporte inicial IPCA+ /mês</label>
+    <button class="info-btn" onclick="openModal('autoIpcaBase')">ℹ</button>
+    <input type="range" class="purple" id="autoIpcaBase" min="100" max="5000" value="400" step="50" oninput="onAuto()">
+    <div class="val" id="v_autoIpcaBase">R$ 400</div>
+  </div>
+  <div class="ctrl purple">
+    <label>Incremento anual IPCA+ /mês</label>
+    <button class="info-btn" onclick="openModal('autoIpcaInc')">ℹ</button>
+    <input type="range" class="purple" id="autoIpcaInc" min="0" max="500" value="100" step="50" oninput="onAuto()">
+    <div class="val" id="v_autoIpcaInc">+ R$ 100/ano</div>
+  </div>
+  <div class="ctrl purple">
+    <label>Aporte inicial RV /mês</label>
+    <button class="info-btn" onclick="openModal('autoRvBase')">ℹ</button>
+    <input type="range" class="purple" id="autoRvBase" min="0" max="5000" value="1000" step="100" oninput="onAuto()">
+    <div class="val" id="v_autoRvBase">R$ 1.000</div>
+  </div>
+  <div class="ctrl purple">
+    <label>Incremento anual RV /mês</label>
+    <button class="info-btn" onclick="openModal('autoRvInc')">ℹ</button>
+    <input type="range" class="purple" id="autoRvInc" min="0" max="500" value="100" step="50" oninput="onAuto()">
+    <div class="val" id="v_autoRvInc">+ R$ 100/ano</div>
+  </div>
+  <div class="ctrl purple">
+    <label>RV começa no ano</label>
+    <button class="info-btn" onclick="openModal('rvStart')">ℹ</button>
+    <input type="range" class="purple" id="autoRvStart" min="0" max="5" value="1" step="1" oninput="onAuto()">
+    <div class="val" id="v_autoRvStart">2º ano</div>
+  </div>
+  <div class="ctrl purple">
+    <label>IPCA+ começa no ano</label>
+    <button class="info-btn" onclick="openModal('ipcaStart')">ℹ</button>
+    <input type="range" class="purple" id="autoIpcaStart" min="0" max="5" value="0" step="1" oninput="onAuto()">
+    <div class="val" id="v_autoIpcaStart">1º ano</div>
+  </div>
+</div>
+
+<div id="autoBanner" class="auto-banner hidden">
+  ⚡ <strong>Modo automático ativo:</strong> os aportes são corrigidos pela inflação todo ano e somados ao incremento configurado. Os valores na tabela são calculados automaticamente — você ainda pode ativar/desativar cada modalidade por ano.
+</div>
+
+<!-- PARÂMETROS -->
+<div class="section-title">⚙️ Parâmetros de mercado</div>
+<div class="global-grid">
+  <div class="ctrl">
+    <label>Idade atual</label>
+    <button class="info-btn" onclick="openModal('idadeAtual')">ℹ</button>
+    <input type="range" id="idadeAtual" min="18" max="55" value="33" step="1" oninput="onGlobal()">
+    <div class="val" id="v_idadeAtual">33 anos</div>
+  </div>
+  <div class="ctrl">
+    <label>Aposentar aos</label>
+    <button class="info-btn" onclick="openModal('idadeMeta')">ℹ</button>
+    <input type="range" id="idadeMeta" min="45" max="75" value="57" step="1" oninput="onGlobal()">
+    <div class="val" id="v_idadeMeta">57 anos</div>
+  </div>
+  <div class="ctrl">
+    <label>Ano de início</label>
+    <button class="info-btn" onclick="openModal('anoInicio')">ℹ</button>
+    <input type="range" id="anoInicio" min="2024" max="2030" value="2026" step="1" oninput="onGlobal()">
+    <div class="val" id="v_anoInicio">2026</div>
+  </div>
+  <div class="ctrl">
+    <label>Inflação estimada</label>
+    <button class="info-btn" onclick="openModal('inflacao')">ℹ</button>
+    <input type="range" id="inflacao" min="2" max="10" value="4" step="0.5" oninput="onGlobal()">
+    <div class="val" id="v_inflacao">4,0% a.a.</div>
+  </div>
+  <div class="ctrl">
+    <label>Juro real IPCA+</label>
+    <button class="info-btn" onclick="openModal('juroReal')">ℹ</button>
+    <input type="range" id="juroReal" min="3" max="10" value="7" step="0.5" oninput="onGlobal()">
+    <div class="val" id="v_juroReal">7,0% a.a.</div>
+  </div>
+  <div class="ctrl">
+    <label>Retorno R. Variável (real)</label>
+    <button class="info-btn" onclick="openModal('retornoRV')">ℹ</button>
+    <input type="range" id="retornoRV" min="5" max="20" value="12" step="1" oninput="onGlobal()">
+    <div class="val" id="v_retornoRV">12% a.a.</div>
+  </div>
+</div>
+
+<!-- RESULTADOS -->
+<div class="section-title">📊 Resultados</div>
+<div class="metrics">
+  <div class="metric">
+    <div class="mlabel">Patrimônio final</div>
+    <button class="info-btn" onclick="openModal('patrimonio')">ℹ</button>
+    <div class="mval c-green" id="m_patrimonio">—</div>
+  </div>
+  <div class="metric">
+    <div class="mlabel">Renda mensal (nominal)</div>
+    <button class="info-btn" onclick="openModal('rendaNominal')">ℹ</button>
+    <div class="mval c-purple" id="m_renda">—</div>
+  </div>
+  <div class="metric">
+    <div class="mlabel">Anos até aposentadoria</div>
+    <div class="mval c-blue" id="m_anos">—</div>
+  </div>
+  <div class="metric">
+    <div class="mlabel">Total aportado</div>
+    <button class="info-btn" onclick="openModal('totalAportado')">ℹ</button>
+    <div class="mval c-orange" id="m_aportado">—</div>
+  </div>
+  <div class="metric wide">
+    <div class="mlabel">💡 Renda em poder de compra de HOJE</div>
+    <button class="info-btn" onclick="openModal('rendaReal')">ℹ</button>
+    <div class="mval c-pink" id="m_rendaReal">—</div>
+    <div style="font-size:0.65rem;color:#444;margin-top:3px;">Deflacionado pela inflação acumulada — o que vale em dinheiro de hoje</div>
+  </div>
+</div>
+
+<div class="alert warn" id="alertaMeta">Calculando...</div>
+
+<div class="chart-card">
+  <h2>📈 Evolução do patrimônio por ano</h2>
+  <button class="info-btn" onclick="openModal('chartEvolucao')">ℹ</button>
+  <canvas id="chartP"></canvas>
+</div>
+<div class="chart-card">
+  <h2>🥧 Composição final do patrimônio</h2>
+  <button class="info-btn" onclick="openModal('chartComposicao')">ℹ</button>
+  <canvas id="chartC"></canvas>
+</div>
+
+<!-- TABELA -->
+<div class="table-card">
+  <h2>📅 Aportes ano a ano</h2>
+  <p class="table-hint" id="tableHint">Ative/desative cada modalidade por ano e edite o valor diretamente na célula.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Ano</th><th>Idade</th>
+        <th colspan="2">Renda Fixa IPCA+</th>
+        <th colspan="2">Renda Variável</th>
+        <th>Patrimônio acum.</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="footer">
+  ⚠️ Simulação educacional. Não constitui recomendação de investimento.<br>
+  Renda calculada pela Regra dos 4% (taxa segura de retirada anual).
+</div>
+
+<script>
+/* ── CONTEÚDO DOS MODAIS ─────────────────────────────────── */
+const HELP = {
+  modo: {
+    title: '✏️ Modos de preenchimento',
+    body: `
+      <p>O simulador oferece dois modos de trabalho:</p>
+      <p><strong>✏️ Manual</strong> — você digita livremente o valor de aporte em cada ano, para cada tipo de investimento. Ideal para quem quer simular cenários específicos, como um ano de aporte menor por causa de uma viagem ou compra planejada.</p>
+      <p><strong>⚡ Automático</strong> — você define apenas o aporte inicial e um incremento anual. O simulador aplica a correção pela inflação todo ano e ainda soma o incremento que você escolheu. Os valores aparecem automaticamente na tabela.</p>
+      <div class="tip">💡 Dica: comece no modo automático para ter uma visão geral, depois mude para manual para ajustar anos específicos com mais precisão.</div>`
+  },
+  idadeAtual: {
+    title: '👤 Idade atual',
+    body: `<p>Sua idade hoje. Junto com a idade de aposentadoria, define o <strong>horizonte de investimento</strong> — quantos anos você tem para acumular patrimônio.</p>
+    <div class="tip b">📌 Quanto mais cedo você começa, mais poderoso é o efeito dos juros compostos. Cada ano a mais pode representar uma diferença enorme no patrimônio final.</div>`
+  },
+  idadeMeta: {
+    title: '🎯 Idade de aposentadoria',
+    body: `<p>A idade em que você pretende parar de trabalhar e viver de renda passiva. Esse é o seu <strong>horizonte de acumulação</strong>.</p>
+    <p>A simulação projeta seu patrimônio acumulado até essa idade, e calcula a renda mensal que esse patrimônio pode gerar de forma sustentável.</p>
+    <div class="tip o">⚠️ Aposentar mais cedo reduz o tempo de acumulação e aumenta o tempo de uso do patrimônio — o que exige um valor final ainda maior.</div>`
+  },
+  anoInicio: {
+    title: '📅 Ano de início',
+    body: `<p>O ano em que você pretende começar a investir. Por padrão está em 2026, mas você pode ajustar caso queira projetar um início futuro ou retroativo.</p>
+    <div class="tip">💡 Adiante o início e veja o impacto direto no patrimônio final — adia um ano geralmente custa mais do que parece.</div>`
+  },
+  inflacao: {
+    title: '📊 Inflação estimada',
+    body: `<p>A taxa de inflação média anual que você espera para o período. Ela afeta o simulador de duas formas:</p>
+    <p><strong>1.</strong> Converte a renda nominal futura em poder de compra de hoje (deflação).</p>
+    <p><strong>2.</strong> No modo automático, é usada para corrigir os aportes ano a ano.</p>
+    <div class="tip b">📌 A meta oficial de inflação do Brasil é 3% a.a. A média histórica fica entre 4% e 5%. Use 4% como base conservadora e 6% para um cenário pessimista.</div>`
+  },
+  juroReal: {
+    title: '📈 Juro real IPCA+',
+    body: `<p>É o rendimento <strong>acima da inflação</strong> que o Tesouro IPCA+ paga. Se a inflação for 4% e o juro real for 7%, o rendimento nominal total será de aproximadamente 11% ao ano.</p>
+    <p>Em março de 2026, o Tesouro IPCA+ 2040 está pagando cerca de <strong>IPCA + 7,1% ao ano</strong> — um nível historicamente alto.</p>
+    <div class="tip g">✅ Travar juro real acima de 6% é considerado uma excelente oportunidade de longo prazo. Abaixo de 4% o investimento perde atratividade frente a outras opções.</div>`
+  },
+  retornoRV: {
+    title: '📉 Retorno Renda Variável (real)',
+    body: `<p>O retorno anual esperado da sua carteira de renda variável, <strong>já descontada a inflação</strong> (retorno real).</p>
+    <p>Historicamente, o Ibovespa entregou cerca de 6–8% real ao ano no longo prazo. ETFs do S&P 500 entregaram 7–10% real. Uma carteira diversificada pode atingir 10–12% em cenários favoráveis.</p>
+    <div class="tip o">⚠️ Atenção: retornos em renda variável têm alta volatilidade no curto prazo. Use números conservadores (8–10%) para não superestimar.</div>`
+  },
+  autoIpcaBase: {
+    title: '💰 Aporte inicial IPCA+',
+    body: `<p>Quanto você vai investir no Tesouro IPCA+ <strong>no primeiro ano</strong> de investimento.</p>
+    <p>Nos anos seguintes, esse valor é automaticamente corrigido pela inflação e somado ao incremento anual que você configurar.</p>
+    <div class="tip b">📌 Exemplo: aporte inicial de R$ 400, inflação de 4% e incremento de R$ 100. No 2º ano o aporte será R$ 400 × 1,04 + R$ 100 = R$ 516. No 3º ano: R$ 516 × 1,04 + R$ 100 = R$ 637. E assim por diante.</div>`
+  },
+  autoIpcaInc: {
+    title: '➕ Incremento anual IPCA+',
+    body: `<p>Valor fixo que é somado ao aporte do IPCA+ a cada ano, <strong>além da correção pela inflação</strong>.</p>
+    <p>Representa o aumento real da sua capacidade de poupança ao longo do tempo — seja por aumento de salário, redução de dívidas ou crescimento profissional.</p>
+    <div class="tip">💡 R$ 100/ano de incremento pode parecer pouco, mas ao longo de 20–25 anos representa um impacto expressivo no patrimônio final por causa dos juros compostos.</div>`
+  },
+  autoRvBase: {
+    title: '💰 Aporte inicial Renda Variável',
+    body: `<p>Quanto você vai investir em renda variável no primeiro ano em que ela estiver ativa.</p>
+    <p>Esse valor é corrigido pela inflação e incrementado nos anos seguintes, da mesma forma que o IPCA+.</p>
+    <div class="tip g">✅ A renda variável tem maior potencial de retorno no longo prazo, mas também maior volatilidade. Um aporte maior aqui faz diferença significativa em horizontes acima de 15 anos.</div>`
+  },
+  autoRvInc: {
+    title: '➕ Incremento anual RV',
+    body: `<p>Valor fixo somado ao aporte de renda variável a cada ano, além da correção pela inflação.</p>
+    <div class="tip">💡 Você pode ter incrementos diferentes para IPCA+ e RV, simulando estratégias em que você aumenta mais agressivamente um dos lados ao longo do tempo.</div>`
+  },
+  rvStart: {
+    title: '🗓️ RV começa no ano',
+    body: `<p>Define em qual ano do plano a renda variável começa a ser aportada. O "1º ano" significa que começa logo no início. O "2º ano" significa que o primeiro ano é só IPCA+, e a RV entra no segundo.</p>
+    <div class="tip b">📌 Sua estratégia atual é focar no Tesouro IPCA+ em 2026 e iniciar renda variável em 2027 — isso corresponde ao "2º ano" nesta configuração.</div>`
+  },
+  ipcaStart: {
+    title: '🗓️ IPCA+ começa no ano',
+    body: `<p>Define em qual ano o investimento em Tesouro IPCA+ tem início. O padrão é o 1º ano.</p>
+    <p>Útil se você quiser simular um cenário onde você começa pela renda variável e só depois adiciona renda fixa.</p>`
+  },
+  patrimonio: {
+    title: '🏦 Patrimônio final',
+    body: `<p>É o total acumulado entre Tesouro IPCA+ e Renda Variável no momento da aposentadoria, em <strong>valores nominais futuros</strong> (sem descontar inflação).</p>
+    <p>Inclui todos os seus aportes mais o rendimento composto ao longo do período.</p>
+    <div class="tip o">⚠️ Como está em valores nominais, parece alto. Para saber o poder de compra real, veja o card "Renda em poder de compra de HOJE".</div>`
+  },
+  rendaNominal: {
+    title: '💵 Renda mensal nominal',
+    body: `<p>A renda mensal que você pode sacar do patrimônio de forma sustentável, calculada pela <strong>Regra dos 4%</strong>.</p>
+    <p>Essa regra diz que você pode retirar 4% do patrimônio por ano (⅓% ao mês) sem consumir o principal ao longo de 30 anos — baseado em estudos históricos de mercado.</p>
+    <div class="tip o">⚠️ Esse valor está em reais do futuro. Para comparar com seu custo de vida hoje, use o card "Renda em poder de compra de HOJE".</div>`
+  },
+  totalAportado: {
+    title: '💳 Total aportado',
+    body: `<p>A soma de tudo que você vai colocar do próprio bolso ao longo do período — sem contar os rendimentos.</p>
+    <p>A diferença entre o patrimônio final e o total aportado é o quanto os <strong>juros compostos trabalharam por você</strong>.</p>
+    <div class="tip g">✅ Em horizontes longos (20+ anos), os rendimentos costumam superar em muito o que foi aportado. É o poder dos juros compostos.</div>`
+  },
+  rendaReal: {
+    title: '💡 Renda em poder de compra de HOJE',
+    body: `<p>Esse é o número mais importante para o seu planejamento. Ele mostra quanto a renda futura <strong>vale em reais de hoje</strong>, descontando a inflação acumulada de todo o período.</p>
+    <p>Exemplo: R$ 20.000/mês em 2050 com inflação de 4% ao ano equivale a aproximadamente R$ 7.500/mês hoje.</p>
+    <div class="tip p">💡 Use este valor para responder: "se eu me aposentar com essa renda, consigo manter meu padrão de vida atual?" Se a resposta for sim, seu plano está no caminho certo.</div>`
+  },
+  chartEvolucao: {
+    title: '📈 Gráfico de evolução',
+    body: `<p>Mostra como o patrimônio cresce ao longo dos anos, separado em três linhas:</p>
+    <p><strong style="color:#60a5fa">Azul — IPCA+:</strong> evolução do Tesouro IPCA+.</p>
+    <p><strong style="color:#4ade80">Verde — Renda Variável:</strong> evolução da carteira de RV.</p>
+    <p><strong style="color:#a78bfa">Roxo tracejado — Total:</strong> soma dos dois.</p>
+    <div class="tip">💡 Observe a curva exponencial nos anos finais — esse é o efeito dos juros compostos acelerando. Os últimos anos do período costumam ser os mais "produtivos".</div>`
+  },
+  chartComposicao: {
+    title: '🥧 Composição do patrimônio',
+    body: `<p>Mostra como o patrimônio final está dividido entre Tesouro IPCA+ e Renda Variável.</p>
+    <p>Uma composição equilibrada entre os dois traz segurança (renda fixa) e crescimento (renda variável), reduzindo o risco geral da carteira.</p>
+    <div class="tip g">✅ Para um perfil arrojado com longo prazo, uma composição de 40–50% em RV é considerada saudável. Acima de 70% aumenta o risco de oscilação no momento da aposentadoria.</div>`
+  },
+};
+
+/* ── MODAL FUNCTIONS ─────────────────────────────────────── */
+function openModal(key) {
+  const h = HELP[key];
+  if (!h) return;
+  document.getElementById('modal-title').textContent = h.title;
+  document.getElementById('modal-body').innerHTML = h.body;
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('overlay')) return;
+  document.getElementById('overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key==='Escape') { document.getElementById('overlay').classList.remove('open'); document.body.style.overflow=''; }});
+
+/* ── SIMULADOR ───────────────────────────────────────────── */
+const fmt  = v => { if (!v||isNaN(v)) return 'R$ 0'; if (v>=1e6) return 'R$ '+(v/1e6).toFixed(2).replace('.',',')+'mi'; return 'R$ '+Math.round(v).toLocaleString('pt-BR'); };
+const fmtM = v => fmt(v)+'/mês';
+const ordinal = n => n===0?'1º':n===1?'2º':n===2?'3º':`${n+1}º`;
+
+let S={}, mode='manual', chartP, chartC, autoRows={};
+
+function P() {
+  return {
+    idadeAtual:+document.getElementById('idadeAtual').value,
+    idadeMeta: +document.getElementById('idadeMeta').value,
+    anoInicio: +document.getElementById('anoInicio').value,
+    inflacao:  +document.getElementById('inflacao').value/100,
+    juroReal:  +document.getElementById('juroReal').value/100,
+    retornoRV: +document.getElementById('retornoRV').value/100,
+  };
+}
+function AP() {
+  return {
+    ipcaBase: +document.getElementById('autoIpcaBase').value,
+    ipcaInc:  +document.getElementById('autoIpcaInc').value,
+    rvBase:   +document.getElementById('autoRvBase').value,
+    rvInc:    +document.getElementById('autoRvInc').value,
+    rvStart:  +document.getElementById('autoRvStart').value,
+    ipcaStart:+document.getElementById('autoIpcaStart').value,
+  };
+}
+
+function updateLabels(p) {
+  document.getElementById('v_idadeAtual').textContent=p.idadeAtual+' anos';
+  document.getElementById('v_idadeMeta').textContent =p.idadeMeta+' anos';
+  document.getElementById('v_anoInicio').textContent =p.anoInicio;
+  document.getElementById('v_inflacao').textContent  =(p.inflacao*100).toFixed(1).replace('.',',')+' % a.a.';
+  document.getElementById('v_juroReal').textContent  =(p.juroReal*100).toFixed(1).replace('.',',')+' % a.a.';
+  document.getElementById('v_retornoRV').textContent =(p.retornoRV*100).toFixed(0)+'% a.a.';
+}
+function updateAutoLabels(ap) {
+  document.getElementById('v_autoIpcaBase').textContent='R$ '+ap.ipcaBase.toLocaleString('pt-BR');
+  document.getElementById('v_autoIpcaInc').textContent =ap.ipcaInc>0?'+ R$ '+ap.ipcaInc+'/ano':'sem incremento';
+  document.getElementById('v_autoRvBase').textContent  ='R$ '+ap.rvBase.toLocaleString('pt-BR');
+  document.getElementById('v_autoRvInc').textContent   =ap.rvInc>0?'+ R$ '+ap.rvInc+'/ano':'sem incremento';
+  document.getElementById('v_autoRvStart').textContent =ordinal(ap.rvStart)+' ano';
+  document.getElementById('v_autoIpcaStart').textContent=ordinal(ap.ipcaStart)+' ano';
+}
+
+function setMode(m) {
+  mode=m;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(m==='auto'?'.m-auto':'.m-man').classList.add('active');
+  document.getElementById('autoConfig').classList.toggle('hidden',m!=='auto');
+  document.getElementById('autoBanner').classList.toggle('hidden',m!=='auto');
+  document.getElementById('tableHint').textContent=m==='auto'
+    ?'No modo automático os aportes são calculados automaticamente. Você ainda pode ativar/desativar cada modalidade por ano.'
+    :'Ative/desative cada modalidade por ano e edite o valor diretamente na célula.';
+  refresh();
+}
+
+function autoAportes(p,ap) {
+  const anos=p.idadeMeta-p.idadeAtual, result={};
+  let ipcaVal=ap.ipcaBase, rvVal=ap.rvBase;
+  for (let i=0;i<anos;i++) {
+    const ano=p.anoInicio+i, old=S[ano]||{};
+    if (i>0) { ipcaVal=ipcaVal*(1+p.inflacao)+ap.ipcaInc; rvVal=rvVal*(1+p.inflacao)+ap.rvInc; }
+    result[ano]={
+      ipca:Math.round(ipcaVal), rv:Math.round(rvVal),
+      ipcaOn:old.ipcaOn!==undefined?old.ipcaOn:(i>=ap.ipcaStart),
+      rvOn:  old.rvOn  !==undefined?old.rvOn  :(i>=ap.rvStart),
+    };
+  }
+  return result;
+}
+
+function syncManual(p) {
+  const anos=p.idadeMeta-p.idadeAtual, newS={};
+  for (let i=0;i<anos;i++) {
+    const ano=p.anoInicio+i, old=S[ano];
+    newS[ano]={ipca:old?.ipca??400,rv:old?.rv??(i===0?0:1000),ipcaOn:old?.ipcaOn??true,rvOn:old?.rvOn??(i>0)};
+  }
+  S=newS;
+}
+
+function buildTable(p,rows) {
+  const anos=p.idadeMeta-p.idadeAtual, tbody=document.getElementById('tbody'), isAuto=mode==='auto';
+  tbody.innerHTML='';
+  for (let i=0;i<anos;i++) {
+    const ano=p.anoInicio+i, idade=p.idadeAtual+i, s=rows[ano], isLast=i===anos-1;
+    const tr=document.createElement('tr');
+    if (isLast) tr.className='apo-row';
+    const iC='num-input'+(isAuto?' auto-val':''), rC='num-input'+(isAuto?' auto-val':'');
+    tr.innerHTML=`
+      <td><strong>${ano}</strong>${isLast?' 🎯':''}</td>
+      <td>${idade}</td>
+      <td><button class="tog ${s.ipcaOn?'i-on':'i-off'}" onclick="toggleRow(${ano},'ipca')">${s.ipcaOn?'✓ ATIVO':'INATIVO'}</button></td>
+      <td><input class="${iC}" type="number" id="i_${ano}" value="${s.ipca}" min="0" step="50" ${s.ipcaOn?'':'disabled'} ${isAuto?'readonly':''} onchange="changeVal(${ano},'ipca',this.value)"></td>
+      <td><button class="tog ${s.rvOn?'r-on':'r-off'}" onclick="toggleRow(${ano},'rv')">${s.rvOn?'✓ ATIVO':'INATIVO'}</button></td>
+      <td><input class="${rC}" type="number" id="r_${ano}" value="${s.rv}" min="0" step="100" ${s.rvOn?'':'disabled'} ${isAuto?'readonly':''} onchange="changeVal(${ano},'rv',this.value)"></td>
+      <td class="pat-cell" id="pat_${ano}">—</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function toggleRow(ano,tipo) {
+  const t=mode==='auto'?autoRows:S;
+  if(tipo==='ipca') t[ano].ipcaOn=!t[ano].ipcaOn; else t[ano].rvOn=!t[ano].rvOn;
+  if(mode==='auto') autoRows=t; else S=t;
+  refresh();
+}
+function changeVal(ano,tipo,val) {
+  if(mode==='auto') return;
+  const v=Math.max(0,parseFloat(val)||0);
+  if(tipo==='ipca') S[ano].ipca=v; else S[ano].rv=v;
+  calcular(P(),S);
+}
+
+function calcular(p,rows) {
+  const taxaIPCA=(1+p.juroReal)*(1+p.inflacao)-1, taxaRV=(1+p.retornoRV)*(1+p.inflacao)-1;
+  const rMIPCA=Math.pow(1+taxaIPCA,1/12)-1, rMRV=Math.pow(1+taxaRV,1/12)-1;
+  const anos=p.idadeMeta-p.idadeAtual;
+  let sIPCA=0,sRV=0,totalAp=0;
+  const labels=[],dI=[],dR=[],dT=[];
+  for (let i=0;i<anos;i++) {
+    const ano=p.anoInicio+i, s=rows[ano]||{ipca:0,rv:0,ipcaOn:false,rvOn:false};
+    const aI=s.ipcaOn?(s.ipca||0):0, aR=s.rvOn?(s.rv||0):0;
+    for(let m=0;m<12;m++){sIPCA=(sIPCA+aI)*(1+rMIPCA);sRV=(sRV+aR)*(1+rMRV);totalAp+=aI+aR;}
+    const tot=sIPCA+sRV;
+    labels.push(ano);dI.push(Math.round(sIPCA));dR.push(Math.round(sRV));dT.push(Math.round(tot));
+    const cell=document.getElementById('pat_'+ano);
+    if(cell) cell.textContent=fmt(tot);
+  }
+  const patFinal=sIPCA+sRV, rendaMensal=patFinal*0.04/12;
+  const deflator=Math.pow(1+p.inflacao,anos), rendaReal=rendaMensal/deflator;
+
+  document.getElementById('m_patrimonio').textContent=fmt(patFinal);
+  document.getElementById('m_renda').textContent=fmtM(rendaMensal);
+  document.getElementById('m_anos').textContent=anos+' anos';
+  document.getElementById('m_aportado').textContent=fmt(totalAp);
+  document.getElementById('m_rendaReal').textContent=fmtM(rendaReal);
+
+  const al=document.getElementById('alertaMeta');
+  if(rendaMensal>=10000){al.className='alert ok';al.innerHTML=`<strong>✅ Meta atingida!</strong> Renda nominal de ${fmtM(rendaMensal)} — equivalente a <strong>${fmtM(rendaReal)}</strong> em poder de compra de hoje.`;}
+  else{al.className='alert warn';al.innerHTML=`<strong>⚠️ Ainda não atingiu a meta.</strong> Renda nominal de ${fmtM(rendaMensal)} (${fmtM(rendaReal)} hoje). Aumente os aportes para chegar em R$ 10.000/mês.`;}
+
+  if(chartP) chartP.destroy();
+  chartP=new Chart(document.getElementById('chartP'),{type:'line',data:{labels,datasets:[
+    {label:'IPCA+',data:dI,borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,0.07)',fill:true,tension:0.4,pointRadius:2},
+    {label:'R. Var.',data:dR,borderColor:'#4ade80',backgroundColor:'rgba(74,222,128,0.07)',fill:true,tension:0.4,pointRadius:2},
+    {label:'Total',data:dT,borderColor:'#a78bfa',fill:false,tension:0.4,pointRadius:2,borderDash:[4,3]},
+  ]},options:{responsive:true,maintainAspectRatio:true,
+    plugins:{legend:{labels:{color:'#888',font:{size:11}}}},
+    scales:{x:{ticks:{color:'#555',font:{size:10}},grid:{color:'#13151e'}},
+            y:{ticks:{color:'#555',font:{size:10},callback:v=>v>=1e6?(v/1e6).toFixed(1)+'M':(v/1e3).toFixed(0)+'K'},grid:{color:'#13151e'}}}}});
+
+  if(chartC) chartC.destroy();
+  if(patFinal>0) chartC=new Chart(document.getElementById('chartC'),{type:'doughnut',
+    data:{labels:['IPCA+ (Tesouro)','Renda Variável'],datasets:[{data:[Math.round(sIPCA),Math.round(sRV)],backgroundColor:['#60a5fa','#4ade80'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#888',font:{size:11}}}}}});
+}
+
+function refresh() {
+  const p=P(); updateLabels(p);
+  let rows;
+  if(mode==='auto'){
+    const ap=AP(); updateAutoLabels(ap);
+    const computed=autoAportes(p,ap);
+    Object.keys(computed).forEach(ano=>{if(autoRows[ano]!==undefined){computed[ano].ipcaOn=autoRows[ano].ipcaOn;computed[ano].rvOn=autoRows[ano].rvOn;}});
+    autoRows=computed; rows=autoRows;
+  } else { syncManual(p); rows=S; }
+  buildTable(p,rows); calcular(p,rows);
+}
+function onGlobal(){refresh();} function onAuto(){refresh();}
+refresh();
+</script>
+</body>
+</html>
